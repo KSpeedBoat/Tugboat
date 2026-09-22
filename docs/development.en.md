@@ -2,7 +2,7 @@
 
 ## Overview
 
-Tugboat is an automated operations platform built with Go (backend) and Vue 3 (frontend).
+Tugboat is an automated operations platform built with Go 1.26.3 (backend) and Vue Vben Admin (frontend).
 It consists of three binary components that work together:
 
 | Component | Binary | Role |
@@ -29,6 +29,63 @@ Web Browser  →  REST API  ──→  tugboat-server
 - **CLI ↔ Server**: HTTP REST API
 - **Server ↔ Agent**: gRPC (protobuf)
 - **Browser ↔ Server**: HTTP REST API
+
+---
+
+## Tech Stack
+
+### Backend
+
+| Category | Choice | Notes |
+|---|---|---|
+| Language | **Go 1.26.3** | Statically compiled, high-concurrency — ideal for long-running ops services |
+| Web framework | **Gin** | Serves the HTTP REST API — mature ecosystem, widely used with GORM |
+| gRPC | `google.golang.org/grpc` | Bidirectional communication between Server and Agent |
+| ORM | **GORM** | Unified database access layer — AutoMigrate, fluent query API |
+| Configuration | **Viper** | YAML config, env-var override, hot-reload support |
+| CLI framework | **Cobra** | `tugboat` CLI command tree |
+| Authentication | **JWT** | Stateless token auth; on logout the token is written to a PostgreSQL blacklist table to invalidate it; natively compatible with Vue Vben Admin's built-in token interceptor |
+| DB migrations | **golang-migrate** | All schema changes managed as versioned SQL files (`migrations/NNN_xxx.up.sql` / `.down.sql`); GORM AutoMigrate is **disabled** |
+
+### Databases & Middleware
+
+| Component | Purpose |
+|---|---|
+| **PostgreSQL** | Primary relational database: agents, inspection results, alert rules, log metadata |
+| **pgvector** (PostgreSQL extension) | Vector storage: AI diagnostic embeddings, semantic log search, alert similarity |
+| **MinIO** | Object storage: inspection report attachments, archived log files, AI context snapshots |
+
+> **pgvector** runs as a PostgreSQL extension — no separate database instance required.
+> Access vector columns via GORM custom types or raw SQL.
+
+### Frontend
+
+| Category | Choice | Notes |
+|---|---|---|
+| Framework | **Vue 3** | Composition API + `<script setup>` |
+| Admin template | **[Vue Vben Admin](https://github.com/vbenjs/vue-vben-admin)** | Enterprise admin framework with built-in routing, auth, layouts, and components |
+| State management | **Pinia** | Default state solution in Vue Vben Admin |
+| UI component library | **Ant Design Vue** | Default component library in Vue Vben Admin |
+| HTTP client | **Axios** | Wrapped inside `src/api/` |
+| Build tool | **Vite** | Fast cold start and HMR |
+
+> Frontend lives in the `web/` directory. It is a customization of Vue Vben Admin that follows
+> its directory conventions (`src/views/`, `src/router/`, `src/store/`, `src/api/`, etc.).
+
+### Data Flow
+
+```
+Browser (Vue Vben Admin)
+    │  HTTP REST (JSON)
+    ▼
+tugboat-server (Go)
+    ├── GORM ──→ PostgreSQL (structured data)
+    │               └── pgvector (vector columns)
+    ├── MinIO SDK ──→ MinIO (object storage)
+    └── gRPC Bidirectional Streaming ──→ tugboat-agent (monitored host)
+            ├── Server → Agent: push inspection tasks, recovery commands
+            └── Agent → Server: report heartbeat, results, logs
+```
 
 ---
 

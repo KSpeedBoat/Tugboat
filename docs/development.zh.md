@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-Tugboat 是一个自动化运维平台，后端使用 Go 编写，前端使用 Vue 3。
+Tugboat 是一个自动化运维平台，后端使用 Go 1.26.3 编写，前端基于 Vue Vben Admin 框架。
 项目由三个可执行文件组成，协同工作：
 
 | 组件 | 二进制名 | 职责 |
@@ -29,6 +29,61 @@ Web 浏览器  →  REST API  ──→  tugboat-server
 - **CLI ↔ Server**：HTTP REST API
 - **Server ↔ Agent**：gRPC（protobuf）
 - **浏览器 ↔ Server**：HTTP REST API
+
+---
+
+## 技术选型
+
+### 后端
+
+| 类别 | 选型 | 说明 |
+|---|---|---|
+| 语言 | **Go 1.26.3** | 静态编译、高并发，适合长期运行的运维服务 |
+| Web 框架 | **Gin** | 提供 HTTP REST API，生态成熟，与 GORM 配合广泛 |
+| gRPC 框架 | `google.golang.org/grpc` | Server ↔ Agent **双向 Streaming**：Server 主动 push 任务，Agent 实时上报结果 |
+| ORM | **GORM** | 统一数据库访问层，支持 AutoMigrate 和链式查询 |
+| 配置管理 | **Viper** | 支持 YAML / 环境变量 / 热重载 |
+| CLI 框架 | **Cobra** | `tugboat` CLI 命令树构建 |
+| 认证方案 | **JWT** | 无状态 Token 认证；退出登录时将 Token 写入 PostgreSQL 黑名单表使其失效；与 Vue Vben Admin 内置 Token 拦截器原生适配 |
+| 数据库迁移 | **golang-migrate** | 所有表结构变更通过版本化 SQL 文件管理（`migrations/NNN_xxx.up.sql` / `.down.sql`）；**禁用** GORM AutoMigrate |
+
+### 数据库与中间件
+
+| 组件 | 用途 |
+|---|---|
+| **PostgreSQL** | 主关系型数据库：存储 Agent、巡检结果、告警规则、日志元数据等结构化数据 |
+| **pgvector**（PostgreSQL 扩展） | 向量存储：AI 诊断嵌入向量、语义日志检索、历史告警相似度匹配 |
+| **MinIO** | 对象存储：巡检报告附件、日志归档文件、AI 上下文快照等非结构化数据 |
+
+> **pgvector** 作为 PostgreSQL 扩展运行，无需额外数据库实例；通过 GORM 的自定义类型或原生 SQL 访问向量列。
+
+### 前端
+
+| 类别 | 选型 | 说明 |
+|---|---|---|
+| 框架 | **Vue 3** | Composition API + `<script setup>` |
+| Admin 模板 | **[Vue Vben Admin](https://github.com/vbenjs/vue-vben-admin)** | 企业级中后台框架，内置路由、权限、布局、组件库 |
+| 状态管理 | **Pinia** | Vue Vben Admin 默认状态方案 |
+| UI 组件库 | **Ant Design Vue** | Vue Vben Admin 默认组件库 |
+| HTTP 客户端 | **Axios** | 封装在 `src/api/` 目录下 |
+| 构建工具 | **Vite** | 快速冷启动与 HMR |
+
+> 前端代码位于 `web/` 目录，基于 Vue Vben Admin 进行二次开发，保持其目录约定（`src/views/`、`src/router/`、`src/store/`、`src/api/` 等）。
+
+### 数据流示意
+
+```
+浏览器（Vue Vben Admin）
+    │  HTTP REST（JSON）
+    ▼
+tugboat-server（Go）
+    ├── GORM ──→ PostgreSQL（结构化数据）
+    │               └── pgvector（向量列）
+    ├── MinIO SDK ──→ MinIO（对象存储）
+    └── gRPC Bidirectional Streaming ──→ tugboat-agent（被监控主机）
+            ├── Server → Agent：推送巡检任务、恢复指令
+            └── Agent → Server：上报心跳、巡检结果、日志
+```
 
 ---
 
