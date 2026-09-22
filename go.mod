@@ -1,6 +1,6 @@
 module github.com/KSpeedBoat/Tugboat
 
-go 1.23.0
+go 1.26.3
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
