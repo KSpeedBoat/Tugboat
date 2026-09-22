@@ -1,0 +1,70 @@
+# =============================================================================
+# docker-compose.dev.yml — Tugboat local development services
+#
+# Services:
+#   postgres  PostgreSQL 17 with pgvector extension
+#   minio     MinIO object storage
+#
+# Usage:
+#   cp deployments/docker/.env.example deployments/docker/.env   # first time
+#   docker compose -f deployments/docker/docker-compose.dev.yml up -d
+#   docker compose -f deployments/docker/docker-compose.dev.yml down
+#   docker compose -f deployments/docker/docker-compose.dev.yml down -v  # also delete volumes
+# =============================================================================
+
+name: tugboat-dev
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 17 + pgvector
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: tugboat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-tugboat}
+      POSTGRES_USER:     ${POSTGRES_USER:-tugboat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tugboat_secret}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro   # auto-run *.sql on first start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tugboat} -d ${POSTGRES_DB:-tugboat}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # MinIO — S3-compatible object storage
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: tugboat-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"     # S3 API
+      - "${MINIO_CONSOLE_PORT:-9001}:9001" # Web Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# -----------------------------------------------------------------------------
+# Named volumes (data persisted across container restarts)
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_data:
+  minio_data:
