@@ -8,7 +8,7 @@
 
 | 脚本 | 说明 | 支持系统 |
 |---|---|---|
-| [`install-docker.sh`](file:///home/spz/workspace/github/zsp108/Tugboat/scripts/install-docker.sh) | 自动安装 Docker Engine 与 Docker Compose 插件，并将当前用户添加至 docker 组 | Ubuntu / Debian |
+| [`docker_install.sh`](file:///home/spz/workspace/github/zsp108/Tugboat/scripts/docker_install.sh) | 自动安装与卸载 Docker 及 Docker Compose 插件，支持自定义版本、仓库通道、存储路径与用户组授权 | Ubuntu / Debian / RHEL / CentOS / Rocky / Fedora |
 
 ---
 
@@ -16,13 +16,27 @@
 
 ### 1. 安装 Docker（仅需执行一次）
 
-如本机尚未安装 Docker 或 Docker Compose，可执行官方源安装脚本：
+如本机尚未安装 Docker，可直接执行安装脚本：
 
 ```bash
-sudo bash scripts/install-docker.sh
+# 默认安装最新稳定版，存储路径为 /var/lib/docker
+sudo bash scripts/docker_install.sh
+
+# 可选：指定版本、通道与数据目录
+# sudo bash scripts/docker_install.sh 27.2.0 stable /data/docker
 ```
 
-> **提示**：安装完成后，脚本会将当前用户加入 `docker` 用户组。若要使免 `sudo` 立即生效，请执行 `newgrp docker` 或重新登录终端。
+> **提示**：安装完成后脚本会自动将当前用户加入 `docker` 组。若要使免 `sudo` 立即生效，请执行 `newgrp docker` 或重新登录终端。
+
+#### 卸载 Docker（如需彻底重置环境）
+
+```bash
+# 仅卸载 Docker 软件，保留容器数据
+sudo bash scripts/docker_install.sh uninstall
+
+# 彻底卸载并清理所有容器、镜像和数据卷
+sudo bash scripts/docker_install.sh uninstall --purge-data
+```
 
 ### 2. 准备环境变量
 
